@@ -2,7 +2,29 @@
 
 NomadWorks reads repository-local configuration from `.nomadworks/nomadworks.yaml`.
 
-This file is typically created during the PMA-led repository setup flow.
+This file is typically created during PMA-led setup or by global auto-onboarding when the plugin is configured with `onboarding: "auto"`.
+
+## Global plugin options
+
+NomadWorks can be configured globally in OpenCode with plugin options:
+
+```json
+{
+  "plugin": [["@neuralnomads/nomadworks", {
+    "onboarding": "auto",
+    "default_team_mode": "full",
+    "auto_init_git_repos_only": true,
+    "pai_root": "~/nomadworks-pai",
+    "sync_repo_path": "~/nomadworks-pai"
+  }]]
+}
+```
+
+- `onboarding`: `off`, `suggest`, or `auto`. `auto` creates missing repo scaffolding without asking PMA.
+- `default_team_mode`: `mini` or `full` for auto-created repo config.
+- `auto_init_git_repos_only`: defaults to true; set false to allow auto-init outside Git repositories.
+- `pai_root`: Git-managed PAI root shared across repositories.
+- `sync_repo_path`: defaults Git operations to the same PAI root.
 
 ## Minimal config
 
@@ -18,7 +40,6 @@ features:
   debug_dumps: true
   codemap_verification: true
   # drive_to_done: false
-  # session_memory: false
   # pai_context: false
 
 policies:
@@ -119,5 +140,35 @@ Create `.nomadworks/agents/<agent>.md` to:
 
 - `features.keep_builtin_agents`: when `true`, NomadWorks will not disable agents that OpenCode already registered, including built-in agents such as `build`, `plan`, `general`, and `explore`. NomadWorks will still set `product_manager` as the default agent.
 - `features.drive_to_done`: when `true`, PMA may explicitly keep a task lifecycle moving until `DONE`, `HARD BLOCKER`, or `CYCLE LIMIT` using the existing task/evidence workflow.
-- `features.session_memory`: when `true`, enables portable workflow memory export/import tools.
-- `features.pai_context`: when `true`, injects selected `.nomadworks/pai/USER` files into configured agent prompts.
+- `features.pai_context`: when `true`, injects selected global and workspace PAI user files into configured agent prompts.
+
+## PAI context
+
+```yaml
+features:
+  pai_context: true
+
+pai:
+  root: ../nomadworks-pai
+  opencode_command: opencode
+  workspace:
+    enabled: true
+    context_files:
+      - MEMORY/PROJECT.md
+      - MEMORY/DECISIONS.md
+      - MEMORY/NOTES.md
+  context_files:
+    - USER/ABOUTME.md
+    - USER/TELOS.md
+    - USER/AISTEERINGRULES.md
+  apply_to_agents:
+    - product_manager
+    - business_analyst
+    - tech_lead
+```
+
+When enabled, NomadWorks appends selected global PAI files first, then selected workspace PAI files. Both live in the Git-managed PAI root, outside the project repository. Global PAI uses `USER/`, `MEMORY/`, and `LEARNINGS/`; workspace PAI uses `WORKSPACES/<repo-id>/`. Neither overrides repository truth, SCRs, task files, evidence, docs, or CodeMaps.
+
+Use `nomadworks_session_export` to export the current OpenCode session, or pass explicit session IDs to export selected sessions using native `opencode export <sessionID>` JSON. Use `nomadworks_session_import` on another machine after `nomadworks_sync_pull` to import those files with native `opencode import <file>`.
+
+Use `nomadworks_sync_pull` and `nomadworks_sync_push` for Git. Git, not NomadWorks, handles text-file merges and conflicts in the PAI root. Global PAI lives under `USER/`, `MEMORY/`, and `LEARNINGS/`; repo-specific PAI lives under `WORKSPACES/<repo-id>/`.
