@@ -25,6 +25,23 @@ Minimal example:
 }
 ```
 
+Auto-onboarding example:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [["@neuralnomads/nomadworks", {
+    "onboarding": "auto",
+    "default_team_mode": "full",
+    "auto_init_git_repos_only": true,
+    "pai_root": "~/nomadworks-pai",
+    "sync_repo_path": "~/nomadworks-pai"
+  }]]
+}
+```
+
+With `onboarding: "auto"`, NomadWorks initializes missing repo scaffolding when the plugin loads. Existing files are never overwritten.
+
 ## 3. Start with PMA
 
 After the plugin loads, open the repository you want to enable and start talking to the `product_manager` agent (PMA).
@@ -36,7 +53,7 @@ During setup, PMA should ask whether you want:
 - `mini` team mode for simple repositories and `tiny` / `standard` work
 - `full` team mode for the complete collective, including `complex` workflows
 
-You do not need to manually run NomadWorks initialization commands as a first step.
+You do not need to manually run NomadWorks initialization commands as a first step. With global auto-onboarding enabled, you also do not need to ask PMA to initialize the repository.
 
 ## 4. Repository initialization artifacts
 

@@ -17,9 +17,23 @@ Add the plugin to your OpenCode config:
 }
 ```
 
+Optional auto-onboarding:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [["@neuralnomads/nomadworks", {
+    "onboarding": "auto",
+    "default_team_mode": "full",
+    "pai_root": "~/nomadworks-pai",
+    "sync_repo_path": "~/nomadworks-pai"
+  }]]
+}
+```
+
 Then restart OpenCode, open the target repository, and start talking to the `product_manager` agent (PMA).
 
-PMA will guide the repository setup flow and, when needed, initialize NomadWorks inside the repo for you. The user does not need to manually run NomadWorks commands to get started.
+PMA will guide the repository setup flow and, when needed, initialize NomadWorks inside the repo for you. With `onboarding: "auto"`, NomadWorks creates missing repo scaffolding as soon as the plugin loads, without asking PMA first.
 
 ## Configure
 
@@ -104,6 +118,11 @@ NomadWorks provides these plugin tools:
 - `nomadworks_validate`
 - `nomadworks_start_discussion`
 - `nomadworks_stop_discussion`
+- `nomadworks_session_export`
+- `nomadworks_session_import`
+- `nomadworks_sync_status`
+- `nomadworks_sync_pull`
+- `nomadworks_sync_push`
 - `nomadflow_run_workflow`
 - `nomadflow_prompt_workflow`
 
