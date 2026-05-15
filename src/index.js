@@ -508,7 +508,7 @@ function scaffoldRepository(worktree, teamMode) {
     const enabled = isAgentEnabledForTeamMode(id, requestedTeamMode) ? "true" : "false";
     agentsSection += `  ${id}:\n    enabled: ${enabled}\n`;
   }
-  nomadworksConfig = nomadworksConfig.replace("agents:", "agents:\n" + agentsSection);
+  nomadworksConfig = nomadworksConfig.replace(/^agents:\s*$/m, "agents:\n" + agentsSection.trimEnd());
 
   const codemapConfig = fs.readFileSync(codemapTmplPath, "utf8").replace("{{projectName}}", path.basename(worktree));
   const created = [];
@@ -1267,8 +1267,8 @@ function getModePromptFragment(agentId, operatingTeamMode, worktree) {
   return readResolvedFile(fragmentPath, worktree);
 }
 
-export default async function NomadWorksPlugin(input) {
-  const pluginOptions = input.options || input.config || {};
+export default async function NomadWorksPlugin(input, options = {}) {
+  const pluginOptions = input.options || input.config || options || {};
   const worktree = path.resolve(input.worktree || process.cwd());
   const debugDir = generatedAgentsDir(worktree);
   const configPath = resolveConfigPath(worktree);
