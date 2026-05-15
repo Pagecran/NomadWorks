@@ -195,6 +195,23 @@ function runOpenCodeCommand(command, commandArgs, worktree) {
   return result.stdout || "";
 }
 
+function extractPromptResultText(runResult) {
+  const candidateParts = runResult?.data?.parts || runResult?.parts || [];
+  if (Array.isArray(candidateParts) && candidateParts.length > 0) {
+    return candidateParts.map(part => part?.text || "").filter(Boolean).join("\n").trim();
+  }
+
+  const text = runResult?.data?.text || runResult?.text || runResult?.data?.message || runResult?.message;
+  if (typeof text === "string" && text.trim()) return text.trim();
+
+  if (runResult?.data && Object.keys(runResult.data).length > 0) return JSON.stringify(runResult.data, null, 2);
+  const resultWithoutEmptyData = runResult && Object.fromEntries(
+    Object.entries(runResult).filter(([key, value]) => key !== "data" || (value && Object.keys(value).length > 0))
+  );
+  if (resultWithoutEmptyData && Object.keys(resultWithoutEmptyData).length > 0) return JSON.stringify(resultWithoutEmptyData, null, 2);
+  return "No final text was returned by the Workflow Runner session.";
+}
+
 async function exportOpenCodeSessions(worktree, repoCfg, options = {}, args = {}) {
   const sessionIds = parseSessionIds(args.session_ids);
   if (sessionIds.length === 0 && args.current_session_id) sessionIds.push(args.current_session_id);
@@ -322,14 +339,26 @@ function syncStatus(worktree, repoCfg, options, args = {}) {
 }
 
 function runGitStatus(syncRoot) {
-  return runGitSyncCommand(syncRoot, ["status", "--short", "--branch"]);
+  const status = runGitSyncCommand(syncRoot, ["status", "--short", "--branch"]);
+  const lines = status.stdout.split(/\r?\n/).filter(Boolean);
+  const branchLine = lines[0] || "";
+  const divergence = branchLine.match(/\[(.*?)\]/)?.[1] || "";
+  return {
+    ...status,
+    branch: branchLine.replace(/^##\s*/, "").replace(/\s*\[.*\]$/, ""),
+    dirty: lines.slice(1).length > 0,
+    ahead: Number(divergence.match(/ahead\s+(\d+)/)?.[1] || 0),
+    behind: Number(divergence.match(/behind\s+(\d+)/)?.[1] || 0),
+    has_upstream: branchLine.includes("...")
+  };
 }
 
-function runGitSyncCommand(syncRoot, args) {
+function runGitSyncCommand(syncRoot, args, options = {}) {
   if (!fs.existsSync(path.join(syncRoot, ".git"))) throw new Error(`Sync root is not an existing Git repository: ${syncRoot}`);
   const result = spawnSync("git", args, { cwd: syncRoot, encoding: "utf8", shell: false });
   if (result.error) throw result.error;
-  if (result.status !== 0) {
+  const allowedStatuses = new Set([0, ...(options.allowStatuses || [])]);
+  if (!allowedStatuses.has(result.status)) {
     const detail = (result.stderr || result.stdout || "unknown git error").trim();
     throw new Error(`git ${args.join(" ")} failed: ${detail}`);
   }
@@ -1306,8 +1335,10 @@ export default async function NomadWorksPlugin(input) {
 
       if (debug) console.log(`[NomadFlow] Workflow Runner session ${sessionId} returned control.`);
 
-      // Capture final message and notify PMA
-      const finalMessage = runResult.data.parts.map(p => p.text).join("\n");
+      // Capture final message and notify PMA. OpenCode client versions differ
+      // in the exact response shape, so extract defensively instead of
+      // assuming data.parts exists.
+      const finalMessage = extractPromptResultText(runResult);
       if (debug) console.log(`[NomadFlow] Attempting to notify PMA session ${pmaSessionId} of completion...`);
       
       await client.session.promptAsync({
@@ -1637,7 +1668,22 @@ export default async function NomadWorksPlugin(input) {
           const root = resolveConfiguredPaiRoot(context.worktree, repoCfg, pluginOptions, args);
           const message = typeof args.message === "string" && args.message.trim() ? args.message.trim() : "sync nomadworks pai";
           const add = runGitSyncCommand(root, ["add", "."]);
-          const commit = runGitSyncCommand(root, ["commit", "-m", message]);
+          const commit = runGitSyncCommand(root, ["commit", "-m", message], { allowStatuses: [1] });
+          const commitOutput = `${commit.stdout}\n${commit.stderr}`.toLowerCase();
+          if (commit.status !== 0 && (commitOutput.includes("nothing to commit") || commitOutput.includes("no changes added to commit"))) {
+            return JSON.stringify({
+              sync_root: root,
+              add,
+              commit,
+              push: null,
+              status: "no_changes",
+              message: "No PAI changes to commit."
+            }, null, 2);
+          }
+          if (commit.status !== 0) {
+            const detail = (commit.stderr || commit.stdout || "unknown git error").trim();
+            return `FAIL: git commit -m ${message} failed: ${detail}`;
+          }
           const push = runGitSyncCommand(root, ["push"]);
           return JSON.stringify({ sync_root: root, add, commit, push }, null, 2);
         } catch (e) {
