@@ -113,7 +113,7 @@ Imports selected OpenCode sessions from native `opencode export` JSON files in t
 
 ## `nomadworks_sync_status`
 
-Shows sync repository status for global PAI and the current workspace.
+Shows the configured PAI root, workspace manifest, and `git status --short --branch` when the PAI root is a Git repository.
 
 ### Arguments
 
@@ -125,7 +125,7 @@ Runs `git pull --ff-only` in the configured sync repository.
 
 ## `nomadworks_sync_push`
 
-Runs `git add .`, `git commit`, and `git push` in the configured sync repository.
+Runs `git add .`, `git commit`, and `git push` in the configured sync repository. If there are no PAI changes to commit, it returns a `no_changes` result instead of failing.
 
 ### Arguments
 

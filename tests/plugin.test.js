@@ -108,6 +108,27 @@ describe("NomadWorks plugin PAI behavior", () => {
     await expect(plugin.tool.nomadworks_sync_push.execute({}, { worktree })).resolves.toMatch(/^FAIL: git (commit|push)/);
   });
 
+  test("sync push reports no changes as a no-op instead of failure", async () => {
+    const paiRoot = createGitRepo();
+    spawnSync("git", ["config", "user.email", "test@example.com"], { cwd: paiRoot, encoding: "utf8", shell: false });
+    spawnSync("git", ["config", "user.name", "NomadWorks Test"], { cwd: paiRoot, encoding: "utf8", shell: false });
+    const worktree = createTestEnv([
+      "features:",
+      "  debug_dumps: false",
+      "pai:",
+      `  root: ${JSON.stringify(paiRoot)}`,
+      ""
+    ].join("\n"));
+    const plugin = await NomadWorksPlugin({ worktree, options: {} });
+    spawnSync("git", ["add", "."], { cwd: paiRoot, encoding: "utf8", shell: false });
+    spawnSync("git", ["commit", "-m", "seed pai"], { cwd: paiRoot, encoding: "utf8", shell: false });
+
+    const secondResult = JSON.parse(await plugin.tool.nomadworks_sync_push.execute({}, { worktree }));
+
+    expect(secondResult.status).toBe("no_changes");
+    expect(secondResult.push).toBeNull();
+  });
+
   test("session export requires an explicit configured PAI root", async () => {
     const worktree = createTestEnv([
       "features:",
@@ -158,5 +179,40 @@ describe("NomadWorks plugin PAI behavior", () => {
 
     await expect(plugin.tool.nomadworks_sync_status.execute({}, { worktree })).resolves.toMatch(/^FAIL: PAI root must be outside the workspace/);
     expect(fs.existsSync(path.join(worktree, ".nomadworks", "pai"))).toBe(false);
+  });
+
+  test("workflow runner monitor handles prompt results without data.parts", async () => {
+    const worktree = createTestEnv([
+      "enabled: true",
+      "team_mode: full",
+      "features:",
+      "  debug_dumps: false",
+      ""
+    ].join("\n"));
+    const promptAsync = jest.fn().mockResolvedValue({ data: true });
+    const client = {
+      session: {
+        create: jest.fn().mockResolvedValue({ data: { id: "runner-no-parts" } }),
+        prompt: jest.fn().mockResolvedValue({ data: {} }),
+        promptAsync
+      }
+    };
+    const plugin = await NomadWorksPlugin({ worktree, options: {}, client });
+
+    const result = await plugin.tool.nomadflow_run_workflow.execute(
+      { task_path: "missing-task.md", instructions: "Audit only." },
+      { worktree, sessionId: "pma-session" }
+    );
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(result).toContain("SUCCESS: Workflow Runner session started");
+    expect(promptAsync).toHaveBeenCalledWith(expect.objectContaining({
+      path: { id: "pma-session" },
+      body: expect.objectContaining({
+        parts: [expect.objectContaining({
+          text: expect.stringContaining("No final text was returned by the Workflow Runner session.")
+        })]
+      })
+    }));
   });
 });
