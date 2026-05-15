@@ -28,7 +28,7 @@
 - Validation honors `.gitignore`, skips hidden directory trees such as `.github/`, and exempts `tasks`, `evidences`, `docs`, `templates`, and `dist` from mandatory codemap and shadow-file checks.
 - Module-scope codemaps must index every sibling source file with the extensions listed in `src/validate_logic.js`; unindexed source files fail validation.
 - For `entrypoints`, `sources_of_truth`, and `links`, nested paths with `/` fail the Rule of Local Knowledge unless they start with `./`.
-- Markdown placeholders `[To be defined]` and `[Insert ...]` fail validation outside `tasks/done`.
+- Unresolved Markdown template placeholders fail validation outside `tasks/done`.
 
 ## Release
 - CI release runs only on pushes to `dev` and `main` using Node.js 24, `npm ci`, then `npm run release:check`.

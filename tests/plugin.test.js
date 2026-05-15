@@ -40,6 +40,9 @@ describe("NomadWorks plugin PAI behavior", () => {
 
     expect(fs.existsSync(path.join(worktree, ".nomadworks", "nomadworks.yaml"))).toBe(true);
     expect(fs.existsSync(path.join(worktree, "codemap.yml"))).toBe(true);
+    const generatedCodemap = fs.readFileSync(path.join(worktree, "codemap.yml"), "utf8");
+    expect(generatedCodemap).toContain("path: ./docs/core/agent_orchestration.md");
+    expect(generatedCodemap).toContain("path: ./docs/architecture/TECHNICAL_ARCHITECTURE.md");
     const generatedConfig = YAML.parse(fs.readFileSync(path.join(worktree, ".nomadworks", "nomadworks.yaml"), "utf8"));
     expect(generatedConfig.team_mode).toBe("mini");
     expect(generatedConfig.agents.product_manager.enabled).toBe(true);
